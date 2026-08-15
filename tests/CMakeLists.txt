@@ -217,6 +217,12 @@ endif()
 target_compile_options (${target_name} PRIVATE
     $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:GNU>>:-Wno-subobject-linkage>)
 
+# ==== Link EGL on Linux for deterministic visual rendering tests
+if (YUP_PLATFORM_LINUX)
+    find_package (EGL REQUIRED)
+    target_link_libraries (${target_name} PRIVATE EGL::EGL)
+endif()
+
 set_target_properties (${target_name} PROPERTIES
     XCODE_SCHEME_ARGUMENTS "--gtest_filter=*"
     VS_DEBUGGER_COMMAND_ARGUMENTS "--gtest_filter=*")
