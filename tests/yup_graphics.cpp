@@ -51,6 +51,7 @@
 #include "yup_graphics/yup_StyledText.cpp"
 #include "yup_graphics/yup_SVGDocument.cpp"
 #include "yup_graphics/yup_SVGParser.cpp"
+#include "yup_graphics/yup_VerifyRendering.cpp"
 
 #if YUP_IMAGE_FORMAT_BMP
 #include "yup_graphics/yup_BmpImageFormat.cpp"
