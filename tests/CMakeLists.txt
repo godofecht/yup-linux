@@ -219,8 +219,12 @@ target_compile_options (${target_name} PRIVATE
 
 # ==== Link EGL on Linux for deterministic visual rendering tests
 if (YUP_PLATFORM_LINUX)
-    find_package (EGL REQUIRED)
-    target_link_libraries (${target_name} PRIVATE EGL::EGL)
+    find_library (EGL_LIBRARY NAMES EGL)
+    if (EGL_LIBRARY)
+        target_link_libraries (${target_name} PRIVATE ${EGL_LIBRARY})
+    else()
+        _yup_message (FATAL_ERROR "EGL library not found — install libegl-dev")
+    endif()
 endif()
 
 set_target_properties (${target_name} PROPERTIES
