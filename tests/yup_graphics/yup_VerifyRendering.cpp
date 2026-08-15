@@ -368,14 +368,17 @@ TEST_F (VerifyRenderingTests, SecondClearOverwritesFirst)
 TEST_F (VerifyRenderingTests, FrameClearViaRiveRenderer)
 {
     constexpr int w = 32, h = 32;
-    auto target = device->createOffscreenTarget (w, h);
+    // Use createRenderableTarget which reserves a dedicated render context,
+    // required for beginOffscreen/endOffscreen to actually drive a frame.
+    // createOffscreenTarget does not set contextSlot, so beginOffscreen is a no-op.
+    auto target = device->createRenderableTarget (w, h);
     ASSERT_NE (target, nullptr);
 
     rive::gpu::RenderContext::FrameDescriptor frameDesc;
     frameDesc.renderTargetWidth = static_cast<uint32_t> (w);
     frameDesc.renderTargetHeight = static_cast<uint32_t> (h);
     frameDesc.loadAction = rive::gpu::LoadAction::clear;
-    frameDesc.clearColor = 0xFF0000FF; // ARGB: opaque red
+    frameDesc.clearColor = 0xFF0000FF; // Rive ColorInt: 0xAARRGGBB = opaque blue
 
     device->beginOffscreen (*target, frameDesc);
     device->endOffscreen (*target);
@@ -383,11 +386,7 @@ TEST_F (VerifyRenderingTests, FrameClearViaRiveRenderer)
     PixelBuffer pb (w, h);
     ASSERT_TRUE (device->readOffscreenPixels (*target, pb.data.data(), pb.data.size()));
 
-    // Rive clearColor is ColorInt (ARGB). 0xFF0000FF = alpha=FF, R=00, G=00, B=FF
-    // Wait: ColorInt in Rive is 0xAARRGGBB, so 0xFF0000FF = A=FF, R=00, G=00, B=FF = blue
-    // Let's just check it's not the default (transparent black) and is a solid color.
-    // The exact color depends on Rive's ColorInt interpretation.
-    // Verify all pixels are the same (solid fill).
+    // Verify all pixels are the same solid color.
     const uint32_t firstPixel = pb.getPixel (0, 0);
     for (int y = 0; y < h; ++y)
         for (int x = 0; x < w; ++x)
