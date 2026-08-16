@@ -1,0 +1,94 @@
+name: Screenshot
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 1"
+
+permissions:
+  contents: write
+
+env:
+  INSTALL_DEPS: >-
+    libasound2-dev libjack-jackd2-dev ladspa-sdk libcurl4-openssl-dev libfreetype6-dev
+    libx11-dev libxcomposite-dev libxcursor-dev libxcursor-dev libxext-dev libxi-dev libxinerama-dev
+    libxrandr-dev libxrender-dev libxfixes-dev libxss-dev libxtst-dev libxkbcommon-dev
+    libglu1-mesa-dev libegl1-mesa-dev libegl-dev mesa-common-dev libgl1-mesa-dri mesa-utils xvfb apitrace
+  LIBGL_ALWAYS_SOFTWARE: "1"
+  GALLIUM_DRIVER: "llvmpipe"
+
+jobs:
+  screenshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Install Dependencies
+      run: sudo apt-get update && sudo apt-get install -y ${INSTALL_DEPS}
+
+    - name: Configure
+      run: cmake ${{ github.workspace }} -G "Ninja Multi-Config" -B ${{ runner.workspace }}/build -DYUP_BUILD_EXAMPLES=ON
+
+    - name: Build example_graphics
+      run: cmake --build ${{ runner.workspace }}/build --config Release --target example_graphics --parallel 2
+
+    - name: Capture Screenshot
+      run: |
+        export DISPLAY=:99
+        export LIBGL_ALWAYS_SOFTWARE=1
+        export GALLIUM_DRIVER=llvmpipe
+        export SDL_VIDEODRIVER=x11
+
+        Xvfb :99 -screen 0 1280x800x24 +extension GLX -nolisten tcp &
+        sleep 2
+
+        cd ${{ runner.workspace }}/build/examples/graphics/Release
+
+        # Trace the app for 6 seconds
+        timeout 8 apitrace trace -o /tmp/yup.trace ./example_graphics &
+        TRACE_PID=$!
+        sleep 6
+        kill -INT $TRACE_PID 2>/dev/null || true
+        sleep 2
+        kill -9 $TRACE_PID 2>/dev/null || true
+
+        # Replay the trace and dump a single frame as PNG
+        glretrace -s /tmp/yup_screenshot /tmp/yup.trace 2>&1 || true
+
+        # Find the generated PNG (glretrace appends a frame number)
+        SHOT=$(ls /tmp/yup_screenshot*.png 2>/dev/null | head -1)
+        if [ -z "$SHOT" ]; then
+          echo "No screenshot generated"
+          exit 1
+        fi
+
+        cp "$SHOT" ${{ github.workspace }}/docs/_static/images/yup_graphics_linux_ci.png
+        echo "Screenshot saved from $SHOT"
+
+        kill $(pgrep -f Xvfb) 2>/dev/null || true
+
+    - name: Commit Screenshot
+      run: |
+        cd ${{ github.workspace }}
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        git add docs/_static/images/yup_graphics_linux_ci.png
+
+        if git diff --cached --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "ci: update Linux graphics screenshot [skip ci]
+
+          Auto-generated from example_graphics via apitrace + glretrace
+          on ubuntu-latest with llvmpipe software rendering.
+
+          Generated with [Devin](https://devin.ai)
+
+          Co-Authored-By: Devin <158243242+devin-ai-integration[bot]@users.noreply.github.com>"
+          git push
+        fi

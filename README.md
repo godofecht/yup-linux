@@ -39,6 +39,10 @@ Start with browsing the [documentation](https://yup.readthedocs.io/).
 ## Screenshots
 
 <div style="display: flex; width: 100%; flex-wrap: nowrap;">
+  <a href="./examples/graphics/"><img src="./docs/_static/images/yup_graphics_linux_ci.png" alt="YUP graphics demo on Linux (CI, llvmpipe)" style="width:99%" /></a>
+</div>
+
+<div style="display: flex; width: 100%; flex-wrap: nowrap;">
   <a href="https://kunitoki.github.io/yup/demos/web_render_0/" title="UI courtesy from https://www.drywestdesign.com/">
     <img src="./docs/demos/web_render_0.png" style="width:99%" /></a>
 </div>
