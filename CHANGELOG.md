@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [2.0.0] - Unreleased
 
+### Linux CI
+
+- Added `workflow_dispatch` trigger to `build_linux.yml` so the Linux workflow can be run manually on the fork
+- Fixed CMake option names in `build_linux.yml`: `YUP_ENABLE_TESTS`/`YUP_ENABLE_EXAMPLES` replaced with `YUP_BUILD_TESTS`/`YUP_BUILD_EXAMPLES` (the names the root `CMakeLists.txt` actually defines)
+- Added `libegl-dev` to the Linux CI dependency list for EGL-based visual rendering tests
+- Added a `screenshot.yml` workflow that builds `example_graphics` on Ubuntu with llvmpipe, captures a frame via `apitrace` + `glretrace`, commits the PNG to `docs/_static/images/yup_graphics_linux_ci.png`, and embeds it in the README
+
+### Tests
+
+- Added `tests/yup_graphics/yup_VerifyRendering.cpp`: deterministic visual rendering tests for Linux that create a headless EGL OpenGL context, render to an offscreen `GpuDevice` target, read back pixels with `glReadPixels`, and assert exact RGBA values. Covers solid-color clears (red, green, blue, white, black, custom), two-pass overwrite, Rive frame clear via `FrameDescriptor`, and target independence. Skips gracefully when no EGL/GL context is available
+
 ### Breaking changes
 
 - macOS: OpenGL rendering backend removed in favor of Metal only
