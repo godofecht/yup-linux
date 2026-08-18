@@ -66,13 +66,39 @@ jobs:
           exit 1
         fi
 
-        cp "$SHOT" ${{ github.workspace }}/docs/_static/images/yup_graphics_linux_ci.png
-        echo "Screenshot saved from $SHOT"
+        # Stage the capture outside the working tree. It is only copied into
+        # docs/ once it has passed the sanity check, so a bad capture can never
+        # reach a commit.
+        cp "$SHOT" ${{ runner.temp }}/yup_screenshot.png
+        echo "Screenshot staged from $SHOT"
 
         kill $(pgrep -f Xvfb) 2>/dev/null || true
 
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Verify Screenshot
+      run: |
+        python3 -m pip install --quiet pillow numpy
+        python3 ${{ github.workspace }}/tools/check_screenshot.py ${{ runner.temp }}/yup_screenshot.png
+
+    - name: Upload Rejected Capture
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: rejected-capture
+        path: |
+          ${{ runner.temp }}/yup_screenshot.png
+          /tmp/yup.trace
+        if-no-files-found: warn
+        retention-days: 14
+
     - name: Commit Screenshot
       run: |
+        cp ${{ runner.temp }}/yup_screenshot.png ${{ github.workspace }}/docs/_static/images/yup_graphics_linux_ci.png
+
         cd ${{ github.workspace }}
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"

@@ -14,6 +14,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fixed CMake option names in `build_linux.yml`: `YUP_ENABLE_TESTS`/`YUP_ENABLE_EXAMPLES` replaced with `YUP_BUILD_TESTS`/`YUP_BUILD_EXAMPLES` (the names the root `CMakeLists.txt` actually defines)
 - Added `libegl-dev` to the Linux CI dependency list for EGL-based visual rendering tests
 - Added a `screenshot.yml` workflow that builds `example_graphics` on Ubuntu with llvmpipe, captures a frame via `apitrace` + `glretrace`, commits the PNG to `docs/_static/images/yup_graphics_linux_ci.png`, and embeds it in the README
+- `screenshot.yml` now stages the capture outside the working tree and gates it on `tools/check_screenshot.py` before committing, so a failed capture cannot be committed. A rejected capture and its `apitrace` trace are uploaded as a build artifact instead
+
+### Tools
+
+- Added `tools/check_screenshot.py`: rejects a captured screenshot that is uninitialised GPU memory or blank, by measuring the fraction of pixels identical to all four neighbours. Uninitialised memory scores near zero on that measure while a real render scores above 80%
 
 ### Tests
 
