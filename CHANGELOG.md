@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added `libegl-dev` to the Linux CI dependency list for EGL-based visual rendering tests
 - Added a `screenshot.yml` workflow that builds `example_graphics` on Ubuntu with llvmpipe, captures a frame via `apitrace` + `glretrace`, commits the PNG to `docs/_static/images/yup_graphics_linux_ci.png`, and embeds it in the README
 - `screenshot.yml` now stages the capture outside the working tree and gates it on `tools/check_screenshot.py` before committing, so a failed capture cannot be committed. A rejected capture and its `apitrace` trace are uploaded as a build artifact instead
+- `build_linux.yml` sets `YUP_TEST_REQUIRE_GPU=1`, so a GPU-backed test that cannot create a device fails the job rather than skipping. A skip is indistinguishable from a pass in a CI summary, which would let a runner that lost llvmpipe report green while proving nothing. It also sets `YUP_TEST_ARTIFACT_DIR` and uploads the PNGs a failing pixel comparison leaves behind
 
 ### Tools
 
