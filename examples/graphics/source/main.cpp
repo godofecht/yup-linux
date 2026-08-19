@@ -310,6 +310,64 @@ public:
     void timerCallback() override
     {
         updateWindowTitle();
+        maybeWriteScreenshot();
+    }
+
+    /** Writes a PNG of the window and quits, when YUP_SCREENSHOT names a path.
+
+        Renders through Component::snapshotToImage, which draws the whole
+        component tree offscreen on the GPU and reads it back inside this
+        process.
+
+        Capturing the presented window from outside does not work headlessly.
+        X keeps no backing store for a GL window, and this app is not
+        continuous, so it paints and swaps once at startup and then idles.
+        Anything reading the window afterwards gets black. Replaying a trace
+        through glretrace is worse: it produces an image that was never on
+        screen at all.
+    */
+    void maybeWriteScreenshot()
+    {
+        const auto path = yup::SystemStats::getEnvironmentVariable ("YUP_SCREENSHOT", {});
+        if (path.isEmpty() || screenshotWritten)
+            return;
+
+        // Let layout, fonts and the first paint settle before capturing.
+        if (++screenshotTicks < 20)
+            return;
+
+        screenshotWritten = true;
+
+        auto* native = getNativeComponent();
+        auto* context = native != nullptr ? native->getGraphicsContext() : nullptr;
+
+        if (context != nullptr)
+        {
+            auto image = snapshotToImage (*context);
+
+            if (image.isValid())
+            {
+                yup::File file (path);
+                file.deleteFile();
+
+                if (auto stream = file.createOutputStream())
+                {
+                    const bool ok = yup::PngImageFormatWriter (stream.release(), image.getPixelFormat()).writeImage (image);
+                    yup::Logger::outputDebugString (ok ? ("screenshot: wrote " + path)
+                                                       : yup::String ("screenshot: write failed"));
+                }
+            }
+            else
+            {
+                yup::Logger::outputDebugString ("screenshot: snapshot failed");
+            }
+        }
+        else
+        {
+            yup::Logger::outputDebugString ("screenshot: no graphics context");
+        }
+
+        yup::YUPApplication::getInstance()->systemRequestedQuit();
     }
 
     void userTriedToCloseWindow() override
@@ -359,6 +417,8 @@ private:
     std::unique_ptr<yup::ListBox> listBox;
     yup::OwnedArray<yup::Component> components;
     yup::Image image;
+    int screenshotTicks = 0;
+    bool screenshotWritten = false;
 };
 
 //==============================================================================

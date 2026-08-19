@@ -13,7 +13,7 @@ env:
     libasound2-dev libjack-jackd2-dev ladspa-sdk libcurl4-openssl-dev libfreetype6-dev
     libx11-dev libxcomposite-dev libxcursor-dev libxcursor-dev libxext-dev libxi-dev libxinerama-dev
     libxrandr-dev libxrender-dev libxfixes-dev libxss-dev libxtst-dev libxkbcommon-dev
-    libglu1-mesa-dev libegl1-mesa-dev libegl-dev mesa-common-dev libgl1-mesa-dri mesa-utils xvfb apitrace
+    libglu1-mesa-dev libegl1-mesa-dev libegl-dev mesa-common-dev libgl1-mesa-dri mesa-utils xvfb
   LIBGL_ALWAYS_SOFTWARE: "1"
   GALLIUM_DRIVER: "llvmpipe"
 
@@ -43,36 +43,28 @@ jobs:
         export GALLIUM_DRIVER=llvmpipe
         export SDL_VIDEODRIVER=x11
 
+        # The app screenshots itself and exits. Capturing it from outside does
+        # not work headlessly: X keeps no backing store for a GL window, and the
+        # demo is not continuous, so it swaps once at startup and then idles.
+        # Replaying a trace through glretrace is worse, it yields an image that
+        # was never on screen.
+        export YUP_SCREENSHOT=${{ runner.temp }}/yup_screenshot.png
+        rm -f "$YUP_SCREENSHOT"
+
         Xvfb :99 -screen 0 1280x800x24 +extension GLX -nolisten tcp &
-        sleep 2
+        sleep 3
 
         cd ${{ runner.workspace }}/build/examples/graphics/Release
+        timeout 120 ./example_graphics || true
 
-        # Trace the app for 6 seconds
-        timeout 8 apitrace trace -o /tmp/yup.trace ./example_graphics &
-        TRACE_PID=$!
-        sleep 6
-        kill -INT $TRACE_PID 2>/dev/null || true
-        sleep 2
-        kill -9 $TRACE_PID 2>/dev/null || true
+        kill $(pgrep -f Xvfb) 2>/dev/null || true
 
-        # Replay the trace and dump a single frame as PNG
-        glretrace -s /tmp/yup_screenshot /tmp/yup.trace 2>&1 || true
-
-        # Find the generated PNG (glretrace appends a frame number)
-        SHOT=$(ls /tmp/yup_screenshot*.png 2>/dev/null | head -1)
-        if [ -z "$SHOT" ]; then
-          echo "No screenshot generated"
+        if [ ! -f "$YUP_SCREENSHOT" ]; then
+          echo "example_graphics did not write a screenshot"
           exit 1
         fi
 
-        # Stage the capture outside the working tree. It is only copied into
-        # docs/ once it has passed the sanity check, so a bad capture can never
-        # reach a commit.
-        cp "$SHOT" ${{ runner.temp }}/yup_screenshot.png
-        echo "Screenshot staged from $SHOT"
-
-        kill $(pgrep -f Xvfb) 2>/dev/null || true
+        echo "Screenshot staged at $YUP_SCREENSHOT"
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -89,9 +81,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: rejected-capture
-        path: |
-          ${{ runner.temp }}/yup_screenshot.png
-          /tmp/yup.trace
+        path: ${{ runner.temp }}/yup_screenshot.png
         if-no-files-found: warn
         retention-days: 14
 
@@ -110,8 +100,8 @@ jobs:
         else
           git commit -m "ci: update Linux graphics screenshot [skip ci]
 
-          Auto-generated from example_graphics via apitrace + glretrace
-          on ubuntu-latest with llvmpipe software rendering.
+          Written by example_graphics itself via YUP_SCREENSHOT on
+          ubuntu-latest with llvmpipe software rendering.
 
           Generated with [Devin](https://devin.ai)
 
