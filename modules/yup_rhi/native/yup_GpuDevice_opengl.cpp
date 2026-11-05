@@ -79,7 +79,7 @@ public:
         // entire Wasm test runner instead of reporting GPU unavailability.
         if (emscripten_webgl_get_current_context() <= 0)
         {
-            fprintf (stderr, "No current WebGL context; OpenGL GPU unavailable.\\n");
+            fprintf (stderr, "No current WebGL context; OpenGL GPU unavailable.\n");
             return;
         }
 #endif
