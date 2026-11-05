@@ -367,11 +367,16 @@ public:
         if (dstSize < bytesPerRow * static_cast<size_t> (target.height))
             return false;
 
-        if (target.getRenderContext() == nullptr)
-        {
-            if (auto* renderTarget = static_cast<rive::gpu::RenderTargetD3D*> (target.getRenderTarget()))
-                gpuContext->CopyResource (target.stagingTexture.Get(), renderTarget->targetTexture());
-        }
+        // A newly created GpuCanvas can be cleared and sampled before its
+        // first 2D frame. endOffscreen() has not run in that case, so the
+        // staging texture is still uninitialised. Refresh from the actual
+        // render target for every readback, including the pre-draw case.
+        // This also prevents stale staging contents after direct GPU clears.
+        auto* renderTarget = static_cast<rive::gpu::RenderTargetD3D*> (target.getRenderTarget());
+        if (renderTarget == nullptr || renderTarget->targetTexture() == nullptr)
+            return false;
+
+        gpuContext->CopyResource (target.stagingTexture.Get(), renderTarget->targetTexture());
 
         D3D11_MAPPED_SUBRESOURCE mapped {};
         HRESULT hr = gpuContext->Map (target.stagingTexture.Get(), 0, D3D11_MAP_READ, 0, &mapped);

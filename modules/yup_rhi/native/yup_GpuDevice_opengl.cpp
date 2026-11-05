@@ -28,6 +28,10 @@
 #include <vector>
 #include <cstring>
 
+#if YUP_EMSCRIPTEN
+#include <emscripten/html5.h>
+#endif
+
 namespace yup
 {
 
@@ -68,6 +72,18 @@ public:
     GpuDeviceGL (Options options)
         : options (options)
     {
+#if YUP_EMSCRIPTEN
+        // In Node.js there is no WebGL context unless one was explicitly
+        // supplied. Querying GL_VERSION in Rive's MakeContext would otherwise
+        // throw a JavaScript TypeError (GLctx is undefined), aborting the
+        // entire Wasm test runner instead of reporting GPU unavailability.
+        if (emscripten_webgl_get_current_context() <= 0)
+        {
+            fprintf (stderr, "No current WebGL context; OpenGL GPU unavailable.\n");
+            return;
+        }
+#endif
+
 #if RIVE_DESKTOP_GL
         if (! gladLoadCustomLoader ((GLADloadfunc) options.loaderFunction))
         {
