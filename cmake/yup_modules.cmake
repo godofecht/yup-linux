@@ -119,11 +119,39 @@ function (_yup_module_fetch_upstream module_name module_path module_upstream mod
         endif()
         set (archive_path "${download_dir}/${archive_name}")
 
-        # SHOW_PROGRESS
-        if (module_sha256)
-            file (DOWNLOAD "${module_upstream}" "${archive_path}" EXPECTED_HASH SHA256=${module_sha256})
-        else()
-            file (DOWNLOAD "${module_upstream}" "${archive_path}")
+        # Download failures are transient on shared macOS/Linux CI runners.
+        # Report the HTTP/TLS status and retry, but never accept a corrupt archive.
+        # Verify the checksum separately so a failed transfer does not cause
+        # CMake's EXPECTED_HASH operation to error before retries can run.
+        set (download_succeeded FALSE)
+        foreach (download_attempt RANGE 1 3)
+            file (DOWNLOAD "${module_upstream}" "${archive_path}"
+                  STATUS download_status LOG download_log
+                  TLS_VERIFY ON TIMEOUT 180 INACTIVITY_TIMEOUT 45)
+            list (GET download_status 0 download_code)
+            list (GET download_status 1 download_message)
+            if (download_code EQUAL 0)
+                if (module_sha256)
+                    file (SHA256 "${archive_path}" downloaded_sha256)
+                    if (NOT downloaded_sha256 STREQUAL module_sha256)
+                        _yup_message (FATAL_ERROR
+                            "Checksum mismatch for ${module_name}: expected ${module_sha256}, got ${downloaded_sha256}")
+                    endif()
+                endif()
+                set (download_succeeded TRUE)
+                break()
+            endif()
+            file (REMOVE "${archive_path}")
+            if (download_attempt LESS 3)
+                math (EXPR download_delay "${download_attempt} * 5")
+                _yup_message (STATUS
+                    "Retrying ${module_name} source download after ${download_message} (attempt ${download_attempt}/3)")
+                execute_process (COMMAND "${CMAKE_COMMAND}" -E sleep "${download_delay}")
+            endif()
+        endforeach()
+        if (NOT download_succeeded)
+            _yup_message (FATAL_ERROR
+                "Failed downloading ${module_name} after 3 attempts: ${module_upstream} (${download_message})")
         endif()
 
         set (extract_dir "${CMAKE_BINARY_DIR}/_yup_upstream_extract/${module_name}")
